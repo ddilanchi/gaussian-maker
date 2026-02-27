@@ -24,38 +24,58 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Install / update dependencies
-echo Installing dependencies (this may take a few minutes on first run)...
-echo You will see packages downloading below - this is normal.
-echo.
-
-:: Upgrade pip first
+echo ============================================
+echo  Step 1/4: Upgrading pip
+echo ============================================
 %PYTHON% -m pip install --upgrade pip --quiet
 
-:: Install packages that need pre-built binaries explicitly (avoids C++ compiler errors)
-echo [1/2] Installing binary packages...
+echo ============================================
+echo  Step 2/4: Installing binary packages
+echo ============================================
 %PYTHON% -m pip install fpsample --prefer-binary
 if errorlevel 1 (
-    echo.
     echo [ERROR] Could not install fpsample.
-    echo Please install Visual Studio Build Tools from:
+    echo Install Visual Studio C++ Build Tools from:
     echo   https://visualstudio.microsoft.com/visual-cpp-build-tools/
-    echo Then re-run this script.
     pause
     exit /b 1
 )
 
-:: Install remaining requirements
-echo [2/2] Installing remaining packages...
-%PYTHON% -m pip install -r "%SCRIPT_DIR%requirements.txt"
+echo ============================================
+echo  Step 3/4: Installing PyTorch with CUDA
+echo ============================================
+:: Check if CUDA-enabled torch is already installed
+%PYTHON% -c "import torch; assert torch.cuda.is_available(), 'no cuda'" >nul 2>&1
 if errorlevel 1 (
-    echo.
+    echo PyTorch CUDA not detected - installing CUDA 12.1 build...
+    %PYTHON% -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+    if errorlevel 1 (
+        echo [ERROR] Failed to install PyTorch. Check your internet connection.
+        pause
+        exit /b 1
+    )
+) else (
+    echo [OK] PyTorch with CUDA already installed.
+)
+
+echo ============================================
+echo  Step 4/4: Installing remaining packages
+echo ============================================
+:: imageio-ffmpeg bundles its own ffmpeg binary - no system install needed
+%PYTHON% -m pip install imageio-ffmpeg -r "%SCRIPT_DIR%requirements.txt"
+if errorlevel 1 (
     echo [ERROR] pip install failed. Check your internet connection.
     pause
     exit /b 1
 )
+
+:: Add the imageio-ffmpeg binary directory to PATH so nerfstudio can find ffmpeg
+for /f "tokens=*" %%i in ('%PYTHON% -c "import pathlib, imageio_ffmpeg; print(pathlib.Path(imageio_ffmpeg.get_ffmpeg_exe()).parent)"') do set FFMPEG_DIR=%%i
+set PATH=%FFMPEG_DIR%;%PATH%
+echo [OK] FFmpeg ready at: %FFMPEG_DIR%
+
 echo.
-echo [OK] Dependencies ready.
+echo [OK] All dependencies ready.
 echo.
 
 :: Check for video files in input folder

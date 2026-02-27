@@ -7,6 +7,9 @@ numpy>=1.24
 tqdm>=4.65
 pyyaml>=6.0
 
+# Bundled FFmpeg binary (no system install required)
+imageio-ffmpeg>=0.5
+
 # Training framework (includes gsplat + COLMAP wrapper)
 nerfstudio>=1.1
 

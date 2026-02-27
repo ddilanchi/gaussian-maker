@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "gaussian-maker"
+version = "0.1.0"
+description = "Convert iPhone, Meta glasses, and other video files into 3D Gaussian splats"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "plyfile>=1.0",
+    "open3d>=0.18",
+    "Pillow>=10.0",
+    "numpy>=1.24",
+    "tqdm>=4.65",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+train = [
+    "torch>=2.1",
+    "torchvision>=0.16",
+    "gsplat>=1.0",
+    "nerfstudio>=1.1",
+]
+
+[project.scripts]
+gaussian-maker = "gaussian_maker.cli:main"
+gm = "gaussian_maker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gaussian_maker*"]

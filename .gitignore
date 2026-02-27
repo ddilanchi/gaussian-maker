@@ -1,0 +1,47 @@
+# Claude Code local settings
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# Outputs
+outputs/
+data/
+processed/
+frames/
+splats/
+*.ply
+*.splat
+*.ksplat
+*.spz
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# COLMAP
+*.db
+sparse/
+dense/
+
+# Nerfstudio
+wandb/

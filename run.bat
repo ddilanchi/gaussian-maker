@@ -25,13 +25,17 @@ if errorlevel 1 (
 )
 
 :: Install / update dependencies
-echo Installing dependencies...
-%PYTHON% -m pip install -r "%SCRIPT_DIR%requirements.txt" --quiet
+echo Installing dependencies (this may take a few minutes on first run)...
+echo You will see packages downloading below - this is normal.
+echo.
+%PYTHON% -m pip install -r "%SCRIPT_DIR%requirements.txt"
 if errorlevel 1 (
+    echo.
     echo [ERROR] pip install failed. Check your internet connection.
     pause
     exit /b 1
 )
+echo.
 echo [OK] Dependencies ready.
 echo.
 

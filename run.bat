@@ -25,12 +25,12 @@ if errorlevel 1 (
 )
 
 echo ============================================
-echo  Step 1/4: Upgrading pip
+echo  Step 1/5: Upgrading pip
 echo ============================================
 %PYTHON% -m pip install --upgrade pip --quiet
 
 echo ============================================
-echo  Step 2/4: Installing binary packages
+echo  Step 2/5: Installing binary packages
 echo ============================================
 %PYTHON% -m pip install fpsample --prefer-binary
 if errorlevel 1 (
@@ -42,37 +42,41 @@ if errorlevel 1 (
 )
 
 echo ============================================
-echo  Step 3/4: Installing PyTorch with CUDA
+echo  Step 3/5: Installing PyTorch with CUDA 12.1
 echo ============================================
-:: Check if CUDA-enabled torch is already installed
-%PYTHON% -c "import torch; assert torch.cuda.is_available(), 'no cuda'" >nul 2>&1
+:: Always force-install the CUDA build to replace any CPU-only version
+echo Installing PyTorch CUDA 12.1 (this may take a few minutes)...
+%PYTHON% -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121 --quiet
 if errorlevel 1 (
-    echo PyTorch CUDA not detected - installing CUDA 12.1 build...
-    %PYTHON% -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-    if errorlevel 1 (
-        echo [ERROR] Failed to install PyTorch. Check your internet connection.
-        pause
-        exit /b 1
-    )
-) else (
-    echo [OK] PyTorch with CUDA already installed.
+    echo [ERROR] Failed to install PyTorch. Check your internet connection.
+    pause
+    exit /b 1
 )
+:: Confirm CUDA is now available
+%PYTHON% -c "import torch; print('  GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NOT FOUND - check NVIDIA drivers')"
 
 echo ============================================
-echo  Step 4/4: Installing remaining packages
+echo  Step 4/5: Installing remaining packages
 echo ============================================
-:: imageio-ffmpeg bundles its own ffmpeg binary - no system install needed
-%PYTHON% -m pip install imageio-ffmpeg -r "%SCRIPT_DIR%requirements.txt"
+%PYTHON% -m pip install imageio-ffmpeg -r "%SCRIPT_DIR%requirements.txt" --quiet
 if errorlevel 1 (
     echo [ERROR] pip install failed. Check your internet connection.
     pause
     exit /b 1
 )
 
-:: Add the imageio-ffmpeg binary directory to PATH so nerfstudio can find ffmpeg
-for /f "tokens=*" %%i in ('%PYTHON% -c "import pathlib, imageio_ffmpeg; print(pathlib.Path(imageio_ffmpeg.get_ffmpeg_exe()).parent)"') do set FFMPEG_DIR=%%i
-set PATH=%FFMPEG_DIR%;%PATH%
-echo [OK] FFmpeg ready at: %FFMPEG_DIR%
+echo ============================================
+echo  Step 5/5: Setting up FFmpeg
+echo ============================================
+:: imageio-ffmpeg ships a binary like "ffmpeg-win64-v7.0.2.exe"
+:: Copy it as plain "ffmpeg.exe" so nerfstudio's shutil.which("ffmpeg") finds it
+set FFMPEG_WRAPPER=%SCRIPT_DIR%.ffmpeg
+if not exist "%FFMPEG_WRAPPER%" mkdir "%FFMPEG_WRAPPER%"
+
+for /f "tokens=*" %%i in ('%PYTHON% -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"') do set FFMPEG_EXE=%%i
+copy /y "%FFMPEG_EXE%" "%FFMPEG_WRAPPER%\ffmpeg.exe" >nul
+set PATH=%FFMPEG_WRAPPER%;%PATH%
+echo [OK] FFmpeg ready: %FFMPEG_WRAPPER%\ffmpeg.exe
 
 echo.
 echo [OK] All dependencies ready.

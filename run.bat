@@ -28,6 +28,25 @@ if errorlevel 1 (
 echo Installing dependencies (this may take a few minutes on first run)...
 echo You will see packages downloading below - this is normal.
 echo.
+
+:: Upgrade pip first
+%PYTHON% -m pip install --upgrade pip --quiet
+
+:: Install packages that need pre-built binaries explicitly (avoids C++ compiler errors)
+echo [1/2] Installing binary packages...
+%PYTHON% -m pip install fpsample --prefer-binary
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Could not install fpsample.
+    echo Please install Visual Studio Build Tools from:
+    echo   https://visualstudio.microsoft.com/visual-cpp-build-tools/
+    echo Then re-run this script.
+    pause
+    exit /b 1
+)
+
+:: Install remaining requirements
+echo [2/2] Installing remaining packages...
 %PYTHON% -m pip install -r "%SCRIPT_DIR%requirements.txt"
 if errorlevel 1 (
     echo.

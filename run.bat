@@ -4,8 +4,6 @@ setlocal enabledelayedexpansion
 set SCRIPT_DIR=%~dp0
 set INPUT_DIR=%SCRIPT_DIR%input
 set OUTPUT_DIR=%SCRIPT_DIR%output
-
-:: Run Python from the project directory so the gaussian_maker package is found
 set PYTHONPATH=%SCRIPT_DIR%
 set PYTHON=python
 set GM=%PYTHON% -m gaussian_maker.cli
@@ -21,10 +19,21 @@ echo.
 :: Verify Python is available
 %PYTHON% --version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python not found. Make sure Python is installed and on your PATH.
+    echo [ERROR] Python not found. Install from https://python.org
     pause
     exit /b 1
 )
+
+:: Install / update dependencies
+echo Installing dependencies...
+%PYTHON% -m pip install -r "%SCRIPT_DIR%requirements.txt" --quiet
+if errorlevel 1 (
+    echo [ERROR] pip install failed. Check your internet connection.
+    pause
+    exit /b 1
+)
+echo [OK] Dependencies ready.
+echo.
 
 :: Check for video files in input folder
 set VIDEO_COUNT=0

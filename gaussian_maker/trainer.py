@@ -1,18 +1,32 @@
 """Gaussian splatting training backends.
 
 Supported trainers:
-  - nerfstudio : Uses `ns-train splatfacto` (recommended, pip-installable)
-  - gsplat     : Direct gsplat training via its example scripts
+  - nerfstudio : Uses nerfstudio.scripts (recommended, pip-installable)
   - opensplat  : OpenSplat binary (cross-platform, no Python GPU needed)
 """
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from rich.console import Console
 
 console = Console()
+
+# Always use the same Python executable that is running this script.
+# This ensures nerfstudio's scripts are found even when ns-train / ns-process-data
+# are not on PATH (common on Windows with user-level pip installs).
+PY = sys.executable
+
+
+def _nerfstudio_available() -> bool:
+    """Return True if nerfstudio is importable."""
+    try:
+        import importlib.util
+        return importlib.util.find_spec("nerfstudio") is not None
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -25,35 +39,21 @@ def train_nerfstudio(
     iterations: int = 30_000,
     save_every: int = 5_000,
 ) -> Path:
-    """Train a 3D Gaussian splat using Nerfstudio's splatfacto method.
-
-    Args:
-        data_dir: Directory containing COLMAP output (with transforms.json or
-                  sparse/ subdirectory). If it contains frames + COLMAP sparse,
-                  use ns-process-data first.
-        output_dir: Root directory for Nerfstudio outputs.
-        iterations: Number of training iterations (default 30k).
-        save_every: Checkpoint interval.
-
-    Returns:
-        Path to the trained config YAML.
-    """
-    if not shutil.which("ns-train"):
-        raise EnvironmentError(
-            "Nerfstudio not found. Install with: pip install nerfstudio"
-        )
+    """Train a 3D Gaussian splat using Nerfstudio's splatfacto method."""
+    if not _nerfstudio_available():
+        raise EnvironmentError("Nerfstudio not found. Install with: pip install nerfstudio")
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        "ns-train", "splatfacto",
+        PY, "-m", "nerfstudio.scripts.train", "splatfacto",
         "--data", str(data_dir),
         "--output-dir", str(output_dir),
         "--max-num-iterations", str(iterations),
         "--steps-per-save", str(save_every),
         "--pipeline.model.cull-alpha-thresh", "0.005",
         "--pipeline.model.continue-cull-post-densification", "True",
-        "--vis", "wandb",  # use 'viewer' to open the web viewer
+        "--vis", "viewer+wandb",
     ]
 
     console.print(f"[bold cyan]Training Gaussian splat[/] with Nerfstudio splatfacto ({iterations:,} iters)...")
@@ -62,7 +62,6 @@ def train_nerfstudio(
     if result.returncode != 0:
         raise RuntimeError("Nerfstudio training failed.")
 
-    # Find the config file
     configs = sorted(output_dir.rglob("config.yml"))
     if not configs:
         raise FileNotFoundError("Could not find Nerfstudio config.yml after training.")
@@ -73,27 +72,19 @@ def train_nerfstudio(
 
 
 def preprocess_nerfstudio(video_path: Path, output_dir: Path) -> Path:
-    """Use ns-process-data to handle frame extraction + COLMAP in one step.
-
-    This is the easiest path: give it a video, it handles everything.
-
-    Returns:
-        Path to the processed data directory (ready for ns-train).
-    """
-    if not shutil.which("ns-process-data"):
-        raise EnvironmentError(
-            "Nerfstudio not found. Install with: pip install nerfstudio"
-        )
+    """Use ns-process-data to handle frame extraction + COLMAP in one step."""
+    if not _nerfstudio_available():
+        raise EnvironmentError("Nerfstudio not found. Install with: pip install nerfstudio")
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        "ns-process-data", "video",
+        PY, "-m", "nerfstudio.scripts.process_data", "video",
         "--data", str(video_path),
         "--output-dir", str(output_dir),
         "--num-frames-target", "150",
         "--sfm-tool", "colmap",
-        "--matching-method", "sequential",  # best for video (sequential frames)
+        "--matching-method", "sequential",
     ]
 
     console.print(f"[bold cyan]Preprocessing video[/] with Nerfstudio (FFmpeg + COLMAP)...")
@@ -115,29 +106,17 @@ def train_opensplat(
     output_dir: Path,
     num_points: int = 100_000,
 ) -> Path:
-    """Train using the OpenSplat binary.
-
-    OpenSplat must be installed: https://github.com/pierotofy/OpenSplat
-    Accepts COLMAP workspace as input.
-
-    Returns:
-        Path to the output .ply file.
-    """
-    if not shutil.which("OpenSplat") and not shutil.which("opensplat"):
+    """Train using the OpenSplat binary."""
+    binary = shutil.which("OpenSplat") or shutil.which("opensplat")
+    if not binary:
         raise EnvironmentError(
             "OpenSplat not found. Download from: https://github.com/pierotofy/OpenSplat/releases"
         )
 
-    binary = shutil.which("OpenSplat") or shutil.which("opensplat")
     output_dir.mkdir(parents=True, exist_ok=True)
     out_ply = output_dir / "splat.ply"
 
-    cmd = [
-        binary,
-        str(colmap_dir),
-        "-n", str(num_points),
-        "-o", str(out_ply),
-    ]
+    cmd = [binary, str(colmap_dir), "-n", str(num_points), "-o", str(out_ply)]
 
     console.print(f"[bold cyan]Training Gaussian splat[/] with OpenSplat ({num_points:,} points)...")
     result = subprocess.run(cmd)
@@ -160,21 +139,8 @@ def train(
     iterations: int = 30_000,
     video_path: Path | None = None,
 ) -> Path:
-    """Dispatch to the correct training backend.
-
-    Args:
-        trainer: One of 'nerfstudio', 'opensplat'.
-        data_dir: Input data directory (COLMAP workspace or processed data).
-        output_dir: Output directory.
-        iterations: Training iterations (nerfstudio only).
-        video_path: Original video (used by nerfstudio all-in-one mode).
-
-    Returns:
-        Path to the trained model or config file.
-    """
     if trainer == "nerfstudio":
         if video_path is not None:
-            # All-in-one: let nerfstudio handle frame extraction + COLMAP
             processed = preprocess_nerfstudio(video_path, data_dir)
             return train_nerfstudio(processed, output_dir, iterations)
         return train_nerfstudio(data_dir, output_dir, iterations)

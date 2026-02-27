@@ -10,7 +10,10 @@ Uses PlayCanvas splat-transform CLI for format conversion when available.
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+PY = sys.executable
 
 from rich.console import Console
 
@@ -56,11 +59,8 @@ def export_nerfstudio_ply(config_path: Path, output_dir: Path) -> Path:
     """Export .ply from a trained Nerfstudio model using ns-export."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if not shutil.which("ns-export"):
-        raise EnvironmentError("ns-export not found. Is nerfstudio installed?")
-
     cmd = [
-        "ns-export", "gaussian-splat",
+        PY, "-m", "nerfstudio.scripts.exporter", "gaussian-splat",
         "--load-config", str(config_path),
         "--output-dir", str(output_dir),
     ]

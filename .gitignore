@@ -26,6 +26,12 @@ splats/
 *.ksplat
 *.spz
 
+# Input/output folder contents (keep the folders, ignore their contents)
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb

@@ -47,21 +47,35 @@ echo [OK] Binary packages ready.
 echo ============================================
 echo  Step 3/6: Installing PyTorch with CUDA
 echo ============================================
-echo Trying CUDA 12.4...
-%PYTHON% -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 --force-reinstall --quiet
+:: Check if CUDA is already working - skip the ~2.5 GB download if so
+%PYTHON% -c "import torch; exit(0 if torch.cuda.is_available() else 1)" >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=*" %%g in ('%PYTHON% -c "import torch; print(torch.cuda.get_device_name(0))"') do echo [OK] GPU already ready: %%g
+    goto pytorch_done
+)
+
+:: Not working - check if torch is installed at all
+%PYTHON% -c "import torch" >nul 2>&1
+if not errorlevel 1 (
+    echo PyTorch installed but CUDA not available.
+    echo Run this once in a terminal to fix it:
+    echo   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 --force-reinstall
+    echo Then re-run this script.
+    echo [WARNING] Continuing with CPU for now.
+    goto pytorch_done
+)
+
+:: torch not installed at all - install CUDA build once
+echo Installing PyTorch CUDA 12.4 ^(~2.5 GB, one-time download^)...
+%PYTHON% -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 --no-cache-dir --quiet
 %PYTHON% -c "import torch; exit(0 if torch.cuda.is_available() else 1)" >nul 2>&1
 if errorlevel 1 (
-    echo Trying CUDA 11.8...
-    %PYTHON% -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118 --force-reinstall --quiet
-    %PYTHON% -c "import torch; exit(0 if torch.cuda.is_available() else 1)" >nul 2>&1
-    if errorlevel 1 (
-        echo [WARNING] GPU not detected - will use CPU. Update NVIDIA drivers if you have a GPU.
-    ) else (
-        for /f "tokens=*" %%g in ('%PYTHON% -c "import torch; print(torch.cuda.get_device_name(0))"') do echo [OK] GPU: %%g
-    )
+    echo [WARNING] GPU not detected after install. Update NVIDIA drivers if you have a GPU.
 ) else (
     for /f "tokens=*" %%g in ('%PYTHON% -c "import torch; print(torch.cuda.get_device_name(0))"') do echo [OK] GPU: %%g
 )
+
+:pytorch_done
 
 echo ============================================
 echo  Step 4/6: Installing Python packages
@@ -72,6 +86,8 @@ if errorlevel 1 (
     pause & exit /b 1
 )
 echo [OK] Python packages ready.
+echo Clearing pip download cache to free disk space...
+%PYTHON% -m pip cache purge >nul 2>&1
 
 echo ============================================
 echo  Step 5/6: Setting up FFmpeg

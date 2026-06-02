@@ -53,7 +53,9 @@ def train_nerfstudio(
         "--steps-per-save", str(save_every),
         "--pipeline.model.cull-alpha-thresh", "0.005",
         "--pipeline.model.continue-cull-post-densification", "True",
-        "--vis", "viewer+wandb",
+        # Local one-click tool: no wandb (its interactive login prompt hangs an
+        # unattended run right as training starts). viewer needs no login.
+        "--vis", "viewer",
     ]
 
     console.print(f"[bold cyan]Training Gaussian splat[/] with Nerfstudio splatfacto ({iterations:,} iters)...")
